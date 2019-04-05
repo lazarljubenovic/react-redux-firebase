@@ -16,6 +16,12 @@ export interface EnhancedFirebaseInstance {
 // Diff / Omit taken from https://www.typescriptlang.org/docs/handbook/release-notes/typescript-2-8.html
 type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>
 
+export type RtdbUid<T> = string & { __UID_FOR__: T }
+export type FirebaseRecord<T> = Record<RtdbUid<T>, T>
+export type FirebaseKvPair<T> = { key: RtdbUid<T>, value: T }
+export type FirebaseKvPairs<T> = Array<FirebaseKvPair<T>>
+export interface FirebaseRtdbSchema { }
+
 // Injects props and removes them from the prop requirements.
 // Will not pass through the injected props if they are passed in during
 // render. Also adds new prop requirements from TNeedsProps.
@@ -453,19 +459,19 @@ export interface WithFirebaseProps<ProfileType> {
     }
 }
 
-export interface FirebaseConnectQueryObject {
-  path: string
+export interface FirebaseConnectQueryObject<T extends Record<string, any> = FirebaseRtdbSchema> {
+  path: keyof T
   type?: 'value' | 'once' | 'child_added' | 'child_removed' | 'child_changed' | 'child_moved'
   queryParams?: string[]
 }
 
-export type FirebaseConnectQuery = (FirebaseConnectQueryObject | string)[]
+export type FirebaseConnectQuery<T extends Record<string, any> = FirebaseRtdbSchema> = (FirebaseConnectQueryObject<T> | keyof T)[]
 
 /**
  * React HOC that attaches/detaches Firebase Real Time Database listeners on mount/unmount
  */
-export function firebaseConnect<ProfileType, TInner = {}>(
-  connect?: mapper<TInner, FirebaseConnectQuery> | FirebaseConnectQuery
+export function firebaseConnect<TSchema extends Record<string, any> = FirebaseRtdbSchema, ProfileType = {}, TInner = {}>(
+  connect?: mapper<TInner, FirebaseConnectQuery<TSchema>> | FirebaseConnectQuery<TSchema>
 ): InferableComponentEnhancerWithProps<
   TInner & WithFirebaseProps<ProfileType>,
   WithFirebaseProps<ProfileType>
@@ -681,15 +687,9 @@ export interface Listeners {
   }
 }
 
-export type TypeWithId<T> = T & { id: string }
+export type Ordered<T extends Record<string, any> = FirebaseRtdbSchema, K1 extends keyof T = keyof T> = { key: RtdbUid<T[K1]>, value: T[K1] }
 
-export interface Ordered<T extends FirestoreTypes.DocumentData> {
-  [collection: string]: TypeWithId<T>[]
-}
-
-export interface Dictionary<T> {
-  [documentId: string]: T
-}
+export type Dictionary<T> = Partial<Record<keyof FirebaseRtdbSchema, T>>
 
 export interface Data<T extends FirestoreTypes.DocumentData> {
   [collection: string]: T
@@ -701,7 +701,7 @@ export namespace FirebaseReducer {
     profile: Profile<ProfileType>
     authError: any
     data: Data<any | Dictionary<any>>
-    ordered: Ordered<any>
+    ordered: Partial<Record<keyof FirebaseRtdbSchema, Ordered[]>>
     errors: any[]
     isInitializing: boolean
     listeners: Listeners
@@ -750,7 +750,7 @@ export namespace FirestoreReducer {
       byQuery: any[]
     }
     listeners: Listeners
-    ordered: Ordered<any>
+    ordered: Record<keyof FirebaseRtdbSchema, Ordered>
     queries: Data<FirestoreQueryOptions & (Dictionary<any> | any)>
     status: {
       requested: Dictionary<boolean>
